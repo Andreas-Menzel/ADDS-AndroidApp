@@ -1,3 +1,19 @@
 <resources>
     <string name="app_name">ADDS</string>
+
+    <string name="hint_email">E-Mail</string>
+    <string name="hint_password">Password</string>
+    <string name="hint_firstname">Firstname</string>
+    <string name="hint_lastname">Lastname</string>
+
+    <string name="btn_register">Register</string>
+    <string name="btn_login">Login</string>
+    <string name="btn_activate_account">Activate Account</string>
+    
+    <string name="title_register">Create Account</string>
+    <string name="title_login">Login</string>
+    <string name="title_activate_account">Activate Account</string>
+
+    <string name="already_have_an_account">Already have an account?</string>
+    <string name="dont_have_an_account_yet">Don\'t have an account yet?</string>
 </resources>
