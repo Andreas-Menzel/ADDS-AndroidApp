@@ -23,6 +23,8 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
+import java.security.Timestamp;
+
 // TODO: setupCallbacks also onResume?
 public class LoginActivity extends Activity {
 
@@ -57,11 +59,17 @@ public class LoginActivity extends Activity {
     }
 
     /**
-     * Registers to the event bus and updates the UI.
+     * Registers to the event bus and updates the UI. Closes the activity if the user is already
+     * logged in (has a valid authentication token).
      */
     @Override
     protected void onResume() {
         super.onResume();
+
+        // Close this activity if the user is already logged in.
+        if(communicationManager.getAccountAuthenticationTokenExpire() > (System.currentTimeMillis() / 1000)) {
+            finish();
+        }
 
         bus.register(this);
         updateUI();
@@ -92,6 +100,7 @@ public class LoginActivity extends Activity {
 
         txtView_dontHaveAnAccountYet.setOnClickListener((View v) -> {
             Intent switchActivityIntent = new Intent(this, RegisterActivity.class);
+            switchActivityIntent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             startActivity(switchActivityIntent);
         });
 

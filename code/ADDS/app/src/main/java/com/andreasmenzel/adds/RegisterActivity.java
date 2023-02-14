@@ -57,11 +57,17 @@ public class RegisterActivity extends Activity {
     }
 
     /**
-     * Registers to the event bus and updates the UI.
+     * Registers to the event bus and updates the UI. Closes the activity if the user is already
+     * logged in (has a valid authentication token).
      */
     @Override
     protected void onResume() {
         super.onResume();
+
+        // Close this activity if the user is already logged in.
+        if(communicationManager.getAccountAuthenticationTokenExpire() > (System.currentTimeMillis() / 1000)) {
+            finish();
+        }
 
         bus.register(this);
         updateUI();
@@ -92,6 +98,7 @@ public class RegisterActivity extends Activity {
 
         txtView_alreadyHaveAnAccount.setOnClickListener((View v) -> {
             Intent switchActivityIntent = new Intent(this, LoginActivity.class);
+            switchActivityIntent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             startActivity(switchActivityIntent);
         });
 

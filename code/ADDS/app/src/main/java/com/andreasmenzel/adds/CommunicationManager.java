@@ -340,6 +340,24 @@ public class CommunicationManager {
     }
 
     /**
+     * Returns the accountAuthenticationToken.
+     *
+     * @return accountAuthenticationToken.
+     */
+    public String getAccountAuthenticationToken() {
+        return accountAuthenticationToken;
+    }
+
+    /**
+     * Returns the expire timestamp of the account authentication.
+     *
+     * @return accountAuthenticationTokenExpire.
+     */
+    public long getAccountAuthenticationTokenExpire() {
+        return accountAuthenticationTokenExpire;
+    }
+
+    /**
      * Returns whether the account activation is currently in progress.
      *
      * @return accountActivationInProgress.
