@@ -11,6 +11,7 @@ import com.andreasmenzel.adds.Events.AccountAuthenticationSucceededPartially;
 import com.andreasmenzel.adds.Events.AccountRegistrationFailed;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceeded;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceededPartially;
+import com.andreasmenzel.adds.Events.ToastMessage;
 import com.andreasmenzel.adds.Events.UpdateAccountActivationUI;
 import com.andreasmenzel.adds.Events.UpdateAccountAuthenticationUI;
 import com.andreasmenzel.adds.Events.UpdateAccountRegistrationUI;
@@ -28,6 +29,9 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+/**
+ * Manages the communication to the User Management System and Booking System.
+ */
 public class CommunicationManager {
 
     private final EventBus bus;
@@ -49,9 +53,11 @@ public class CommunicationManager {
     private final ResponseAnalyzer accountActivationResponseAnalyzer;
 
 
+    /**
+     * Sets up the event bus and all variables.
+     */
     public CommunicationManager() {
         bus = EventBus.getDefault();
-        //bus.register(this); // TODO: unregister
 
         accountEmail = "";
         accountPwdHash = "";
@@ -69,6 +75,17 @@ public class CommunicationManager {
     }
 
 
+    /**
+     * Creates an account by sending a request to the User Management System.
+     * Posts one of three events on the bus, depending on the success of the request:
+     * AccountRegistrationSucceeded, AccountRegistrationSucceededPartially or
+     * AccountRegistrationFailed.
+     *
+     * @param email The email of the user.
+     * @param firstname The firstname of the user.
+     * @param lastname The lastname of the user.
+     * @param password The password of the user.
+     */
     public void registerAccount(String email, String firstname, String lastname, String password) {
         if(accountRegistrationInProgress.compareAndSet(false, true)) {
             accountRegistrationResponseAnalyzer.reset();
@@ -125,11 +142,29 @@ public class CommunicationManager {
     }
 
 
+    /**
+     * Executes the authenticateAccount function with autoAuthenticate=false.
+     *
+     * @param email The email of the user.
+     * @param pwd_hash hash(password+hash).
+     */
     public void authenticateAccount(String email, String pwd_hash) {
         authenticateAccount(email, pwd_hash, false);
     }
 
     // TODO: implement autoAuthenticate
+    /**
+     * Authenticates the account (email + hashed password) by requesting an authentication token
+     * from the User Management System.
+     * Posts one of three events on the bus, depending on the success of the request:
+     * AccountAuthenticationSucceeded, AccountAuthenticationSucceededPartially or
+     * AccountAuthenticationFailed.
+     *
+     * @param email The email of the user.
+     * @param pwd_hash hash(password+salt).
+     * @param autoAuthenticate Automatically start new authentication process before the current
+     *                         authentication token gets invalid.
+     */
     public void authenticateAccount(String email, String pwd_hash, boolean autoAuthenticate) {
         if(accountAuthenticationInProgress.compareAndSet(false, true)) {
             accountAuthenticationResponseAnalyzer.reset();
@@ -204,6 +239,13 @@ public class CommunicationManager {
     }
 
 
+    /**
+     * Activates an account by sending the accountActivationCode to the User Management System.
+     * Posts one of three events on the bus, depending on the success of the request:
+     * AccountActivationSucceeded, AccountActivationSucceededPartially or AccountActivationFailed.
+     *
+     * @param accountActivationCode The account activation code.
+     */
     public void activateAccount(String accountActivationCode) {
         if(accountActivationInProgress.compareAndSet(false, true)) {
             accountActivationResponseAnalyzer.reset();
@@ -255,26 +297,63 @@ public class CommunicationManager {
     }
 
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                    GETTERS AND SETTERS                                     //
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Returns whether the account registration is currently in progress.
+     *
+     * @return accountRegistrationInProgress.
+     */
     public AtomicBoolean getAccountRegistrationInProgress() {
         return accountRegistrationInProgress;
     }
 
+    /**
+     * Returns the accountRegistrationResponseAnalyzer. In this object the errors, warnings,
+     * payload, ... from the last response for the account registration request are stored.
+     *
+     * @return accountActivationResponseAnalyzer.
+     */
     public ResponseAnalyzer getAccountRegistrationResponseAnalyzer() {
         return accountRegistrationResponseAnalyzer;
     }
 
+    /**
+     * Returns whether the account authentication is currently in progress.
+     *
+     * @return accountAuthenticationInProgress.
+     */
     public AtomicBoolean getAccountAuthenticationInProgress() {
         return accountAuthenticationInProgress;
     }
 
+    /**
+     * Returns the accountAuthenticationResponseAnalyzer. In this object the errors, warnings,
+     * payload, ... from the last response for the account authentication request are stored.
+     *
+     * @return accountAuthenticationResponseAnalyzer.
+     */
     public ResponseAnalyzer getAccountAuthenticationResponseAnalyzer() {
         return accountAuthenticationResponseAnalyzer;
     }
 
+    /**
+     * Returns whether the account activation is currently in progress.
+     *
+     * @return accountActivationInProgress.
+     */
     public AtomicBoolean getAccountActivationInProgress() {
         return accountActivationInProgress;
     }
 
+    /**
+     * Returns the accountActivationResponseAnalyzer. In this object the errors, warnings,
+     * payload, ... from the last response for the account activation request are stored.
+     *
+     * @return accountActivationResponseAnalyzer.
+     */
     public ResponseAnalyzer getAccountActivationResponseAnalyzer() {
         return accountActivationResponseAnalyzer;
     }

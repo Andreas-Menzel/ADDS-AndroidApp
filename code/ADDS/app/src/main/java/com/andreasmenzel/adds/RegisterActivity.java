@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import com.andreasmenzel.adds.Events.AccountRegistrationFailed;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceeded;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceededPartially;
+import com.andreasmenzel.adds.Events.ToastMessage;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -31,6 +32,11 @@ public class RegisterActivity extends Activity {
     private ResponseAnalyzer responseAnalyzer;
 
 
+    /**
+     * Gets the communication manager and response analyzer.
+     *
+     * @param savedInstanceState savedInstanceState
+     */
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,6 +46,9 @@ public class RegisterActivity extends Activity {
         responseAnalyzer = communicationManager.getAccountRegistrationResponseAnalyzer();
     }
 
+    /**
+     * Sets up the UI callbacks.
+     */
     @Override
     protected void onStart() {
         super.onStart();
@@ -47,13 +56,20 @@ public class RegisterActivity extends Activity {
         setupUICallbacks();
     }
 
+    /**
+     * Registers to the event bus and updates the UI.
+     */
     @Override
     protected void onResume() {
         super.onResume();
 
         bus.register(this);
+        updateUI();
     }
 
+    /**
+     * Unregisters from the event bus.
+     */
     @Override
     protected void onPause() {
         super.onPause();
@@ -62,6 +78,9 @@ public class RegisterActivity extends Activity {
     }
 
 
+    /**
+     * Sets up the callbacks for the UI elements.
+     */
     private void setupUICallbacks() {
         Button btn_register = findViewById(R.id.btn_register);
         TextView txtView_alreadyHaveAnAccount = findViewById(R.id.txtView_alreadyHaveAnAccount);
@@ -79,8 +98,11 @@ public class RegisterActivity extends Activity {
     }
 
 
+    /**
+     * Updates the UI elements (with the new information).
+     */
     @Subscribe
-    public void updateUI(UpdateUI event) {
+    public void updateUI() {
         runOnUiThread(() -> {
             TextView txtView_registerErrors = findViewById(R.id.txtView_registerErrors);
             TextView txtView_registerWarnings = findViewById(R.id.txtView_registerWarnings);
@@ -106,23 +128,42 @@ public class RegisterActivity extends Activity {
     }
 
 
+    /**
+     * Closes this activity. This function is executed when the account registration succeeded.
+     *
+     * @param event The AccountRegistrationSucceeded event.
+     */
     @Subscribe
     public void AccountRegistrationSucceeded(AccountRegistrationSucceeded event) {
         finish();
     }
 
+    /**
+     * Updates the UI and notifies the user. This function is executed when the account registration
+     * succeeded partially.
+     *
+     * @param event The AccountAuthenticationSucceededPartially event.
+     */
     @Subscribe
     public void AccountRegistrationSucceededPartially(AccountRegistrationSucceededPartially event) {
         bus.post(new ToastMessage("Account created!"));
-        updateUI(null);
+        updateUI();
     }
 
+    /**
+     * Updates the UI. This function is executed when the account registration failed.
+     *
+     * @param event The AccountRegistrationFailed event.
+     */
     @Subscribe
     public void AccountRegistrationFailed(AccountRegistrationFailed event) {
-        updateUI(null);
+        updateUI();
     }
 
 
+    /**
+     * Starts the account registration process with the in the text fields provided information.
+     */
     public void registerAccount() {
         if(!communicationManager.getAccountRegistrationInProgress().get()) {
             EditText editText_accountEmailRegister = findViewById(R.id.editText_accountEmailRegister);

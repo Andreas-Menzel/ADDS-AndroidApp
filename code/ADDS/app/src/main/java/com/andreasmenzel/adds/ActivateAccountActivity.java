@@ -2,7 +2,6 @@ package com.andreasmenzel.adds;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -12,26 +11,16 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.andreasmenzel.adds.Events.AccountActivationFailed;
 import com.andreasmenzel.adds.Events.AccountActivationSucceeded;
 import com.andreasmenzel.adds.Events.AccountActivationSucceededPartially;
+import com.andreasmenzel.adds.Events.ToastMessage;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
-
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
 // TODO: setupCallbacks also onResume?
 public class ActivateAccountActivity extends Activity {
@@ -42,6 +31,11 @@ public class ActivateAccountActivity extends Activity {
     private ResponseAnalyzer responseAnalyzer;
 
 
+    /**
+     * Gets the communication manager and response analyzer.
+     *
+     * @param savedInstanceState savedInstanceState
+     */
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -51,6 +45,9 @@ public class ActivateAccountActivity extends Activity {
         responseAnalyzer = communicationManager.getAccountActivationResponseAnalyzer();
     }
 
+    /**
+     * Sets up the UI callbacks.
+     */
     @Override
     protected void onStart() {
         super.onStart();
@@ -58,14 +55,20 @@ public class ActivateAccountActivity extends Activity {
         setupUICallbacks();
     }
 
+    /**
+     * Registers to the event bus and updates the UI.
+     */
     @Override
     protected void onResume() {
         super.onResume();
 
         bus.register(this);
-        updateUI(null);
+        updateUI();
     }
 
+    /**
+     * Unregisters from the event bus.
+     */
     @Override
     protected void onPause() {
         super.onPause();
@@ -74,6 +77,9 @@ public class ActivateAccountActivity extends Activity {
     }
 
 
+    /**
+     * Sets up the callbacks for the UI elements.
+     */
     private void setupUICallbacks() {
         Button btn_activateAccount = findViewById(R.id.btn_activateAccount);
 
@@ -84,8 +90,10 @@ public class ActivateAccountActivity extends Activity {
     }
 
 
-    @Subscribe
-    public void updateUI(UpdateUI event) {
+    /**
+     * Updates the UI elements (with the new information).
+     */
+    public void updateUI() {
         runOnUiThread(() -> {
             TextView txtView_activateAccountErrors = findViewById(R.id.txtView_activateAccountErrors);
             TextView txtView_activateAccountWarnings = findViewById(R.id.txtView_activateAccountWarnings);
@@ -111,23 +119,42 @@ public class ActivateAccountActivity extends Activity {
     }
 
 
+    /**
+     * Closes this activity. This function is executed when the account activation succeeded.
+     *
+     * @param event The AccountActivationSucceeded event.
+     */
     @Subscribe
     public void accountActivationSucceeded(AccountActivationSucceeded event) {
         finish();
     }
 
+    /**
+     * Updates the UI and notifies the user. This function is executed when the account activation
+     * succeeded partially.
+     *
+     * @param event The AccountActivationSucceededPartially event.
+     */
     @Subscribe
     public void accountActivationSucceededPartially(AccountActivationSucceededPartially event) {
         bus.post(new ToastMessage("Account activated!"));
-        updateUI(null);
+        updateUI();
     }
 
+    /**
+     * Updates the UI. This function is executed when the account activation failed.
+     *
+     * @param event The AccountActivationFailed event.
+     */
     @Subscribe
     public void accountActivationFailed(AccountActivationFailed event) {
-        updateUI(null);
+        updateUI();
     }
 
-    
+
+    /**
+     * Starts the account activation process with the in the text fields provided information.
+     */
     public void activateAccount() {
         if(!communicationManager.getAccountActivationInProgress().get()) {
             EditText editText_accountActivationCode = findViewById(R.id.editText_accountActivationCode);

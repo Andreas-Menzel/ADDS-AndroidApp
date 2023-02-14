@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import com.andreasmenzel.adds.Events.AccountAuthenticationFailed;
 import com.andreasmenzel.adds.Events.AccountAuthenticationSucceeded;
 import com.andreasmenzel.adds.Events.AccountAuthenticationSucceededPartially;
+import com.andreasmenzel.adds.Events.ToastMessage;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -31,6 +32,11 @@ public class LoginActivity extends Activity {
     private ResponseAnalyzer responseAnalyzer;
 
 
+    /**
+     * Gets the communication manager and response analyzer.
+     *
+     * @param savedInstanceState savedInstanceState
+     */
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,6 +46,9 @@ public class LoginActivity extends Activity {
         responseAnalyzer = communicationManager.getAccountAuthenticationResponseAnalyzer();
     }
 
+    /**
+     * Sets up the UI callbacks.
+     */
     @Override
     protected void onStart() {
         super.onStart();
@@ -47,13 +56,20 @@ public class LoginActivity extends Activity {
         setupUICallbacks();
     }
 
+    /**
+     * Registers to the event bus and updates the UI.
+     */
     @Override
     protected void onResume() {
         super.onResume();
 
         bus.register(this);
+        updateUI();
     }
 
+    /**
+     * Unregisters from the event bus.
+     */
     @Override
     protected void onPause() {
         super.onPause();
@@ -62,6 +78,9 @@ public class LoginActivity extends Activity {
     }
 
 
+    /**
+     * Sets up the callbacks for the UI elements.
+     */
     private void setupUICallbacks() {
         Button btn_login = findViewById(R.id.btn_login);
         TextView txtView_dontHaveAnAccountYet = findViewById(R.id.txtView_dontHaveAnAccountYet);
@@ -79,8 +98,10 @@ public class LoginActivity extends Activity {
     }
 
 
-    @Subscribe
-    public void updateUI(UpdateUI event) {
+    /**
+     * Updates the UI elements (with the new information).
+     */
+    public void updateUI() {
         runOnUiThread(() -> {
             TextView txtView_LoginErrors = findViewById(R.id.txtView_LoginErrors);
             TextView txtView_LoginWarnings = findViewById(R.id.txtView_LoginWarnings);
@@ -106,23 +127,42 @@ public class LoginActivity extends Activity {
     }
 
 
+    /**
+     * Closes this activity. This function is executed when the account authentication succeeded.
+     *
+     * @param event The AccountAuthenticationSucceeded event.
+     */
     @Subscribe
     public void AccountAuthenticationSucceeded(AccountAuthenticationSucceeded event) {
         finish();
     }
 
+    /**
+     * Updates the UI and notifies the user. This function is executed when the account
+     * authentication succeeded partially.
+     *
+     * @param event The AccountAuthenticationSucceededPartially event.
+     */
     @Subscribe
     public void AccountAuthenticationSucceededPartially(AccountAuthenticationSucceededPartially event) {
         bus.post(new ToastMessage("Authenticated, thank you!"));
-        updateUI(null);
+        updateUI();
     }
 
+    /**
+     * Updates the UI. This function is executed when the account authentication failed.
+     *
+     * @param event The AccountAuthenticationFailed event.
+     */
     @Subscribe
     public void AccountAuthenticationFailed(AccountAuthenticationFailed event) {
-        updateUI(null);
+        updateUI();
     }
 
 
+    /**
+     * Starts the account authentication process with the in the text fields provided information.
+     */
     public void authenticateAccount() {
         if(!communicationManager.getAccountAuthenticationInProgress().get()) {
             EditText editText_accountEmailLogin = findViewById(R.id.editText_accountEmailLogin);
