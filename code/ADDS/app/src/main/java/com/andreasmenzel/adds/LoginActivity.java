@@ -1,8 +1,175 @@
 package com.andreasmenzel.adds;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.annotation.Nullable;
+
+import com.andreasmenzel.adds.Events.AccountAuthenticationFailed;
+import com.andreasmenzel.adds.Events.AccountAuthenticationSucceeded;
+import com.andreasmenzel.adds.Events.AccountAuthenticationSucceededPartially;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
+// TODO: setupCallbacks also onResume?
 public class LoginActivity extends Activity {
 
+    private final EventBus bus = EventBus.getDefault();
+
+    private CommunicationManager communicationManager;
+    private ResponseAnalyzer responseAnalyzer;
+
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_login);
+
+        communicationManager = MyApplication.getCommunicationManager();
+        responseAnalyzer = communicationManager.getAccountAuthenticationResponseAnalyzer();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        setupUICallbacks();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        bus.register(this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        bus.unregister(this);
+    }
+
+
+    private void setupUICallbacks() {
+        Button btn_login = findViewById(R.id.btn_login);
+        TextView txtView_dontHaveAnAccountYet = findViewById(R.id.txtView_dontHaveAnAccountYet);
+
+        btn_login.setOnClickListener((View v) -> {
+            closeKeyboard();
+            authenticateAccount();
+        });
+
+        txtView_dontHaveAnAccountYet.setOnClickListener((View v) -> {
+            Intent switchActivityIntent = new Intent(this, RegisterActivity.class);
+            startActivity(switchActivityIntent);
+        });
+
+    }
+
+
+    @Subscribe
+    public void updateUI(UpdateUI event) {
+        runOnUiThread(() -> {
+            TextView txtView_LoginErrors = findViewById(R.id.txtView_LoginErrors);
+            TextView txtView_LoginWarnings = findViewById(R.id.txtView_LoginWarnings);
+
+            String errors_string = responseAnalyzer.getErrorsString();
+            if(errors_string != null) {
+                txtView_LoginErrors.setText(errors_string);
+                txtView_LoginErrors.setVisibility(View.VISIBLE);
+            } else {
+                txtView_LoginErrors.setVisibility(View.GONE);
+                txtView_LoginErrors.setText("");
+            }
+
+            String warnings_string = responseAnalyzer.getWarningsString();
+            if(warnings_string != null) {
+                txtView_LoginWarnings.setText(warnings_string);
+                txtView_LoginWarnings.setVisibility(View.VISIBLE);
+            } else {
+                txtView_LoginWarnings.setVisibility(View.GONE);
+                txtView_LoginWarnings.setText("");
+            }
+        });
+    }
+
+
+    @Subscribe
+    public void AccountAuthenticationSucceeded(AccountAuthenticationSucceeded event) {
+        finish();
+    }
+
+    @Subscribe
+    public void AccountAuthenticationSucceededPartially(AccountAuthenticationSucceededPartially event) {
+        bus.post(new ToastMessage("Authenticated, thank you!"));
+        updateUI(null);
+    }
+
+    @Subscribe
+    public void AccountAuthenticationFailed(AccountAuthenticationFailed event) {
+        updateUI(null);
+    }
+
+
+    public void authenticateAccount() {
+        if(!communicationManager.getAccountAuthenticationInProgress().get()) {
+            EditText editText_accountEmailLogin = findViewById(R.id.editText_accountEmailLogin);
+            EditText editText_accountPasswordLogin = findViewById(R.id.editText_accountPasswordLogin);
+
+            String accountEmail = editText_accountEmailLogin.getText().toString();
+            String accountPassword = editText_accountPasswordLogin.getText().toString();
+
+            // Check if all required editTexts were filled out.
+            boolean allRequiredFieldsFilled = true;
+            if(TextUtils.isEmpty(accountEmail)) {
+                editText_accountEmailLogin.setError("Please enter a valid email address.");
+                allRequiredFieldsFilled = false;
+            }
+            if(TextUtils.isEmpty(accountPassword)) {
+                editText_accountPasswordLogin.setError("Please enter your password.");
+                allRequiredFieldsFilled = false;
+            }
+            if(!allRequiredFieldsFilled) {
+                return;
+            }
+
+            communicationManager.authenticateAccount(accountEmail, accountPassword);
+        } else {
+            bus.post(new ToastMessage("Registration already in progress."));
+        }
+    }
+
+
+    /**
+     * Closes the keyboard.
+     */
+    private void closeKeyboard() {
+        View view = this.getCurrentFocus();
+        if (view != null) {
+            InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+    }
+
+
+    /**
+     * Shows a toast message.
+     */
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void showToast(ToastMessage toastMessage) {
+        Toast.makeText(getApplicationContext(), toastMessage.getMessage(), Toast.LENGTH_LONG).show();
+    }
 
 }

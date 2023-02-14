@@ -11,15 +11,13 @@ public class ResponseAnalyzer {
     private boolean executed = false;
     private final LinkedList<String> errors = new LinkedList<String>();
     private final LinkedList<String> warnings = new LinkedList<String>();
-
-    private boolean somethingChanged = true;
+    private JSONObject payload = null;
 
     public void reset() {
         executed = false;
         errors.clear();
         warnings.clear();
-
-        somethingChanged = true;
+        payload = null;
     }
 
     public void analyze(String response) {
@@ -30,7 +28,11 @@ public class ResponseAnalyzer {
             JSONArray response_errors = json.getJSONArray("errors");
             JSONArray response_warnings = json.getJSONArray("warnings");
 
-            setExecuted(response_executed);
+            if(json.has("payload")) {
+                payload = json.getJSONObject("payload");
+            }
+
+            executed = response_executed;
 
             // Add errors
             for(int i = 0; i < response_errors.length(); ++i) {
@@ -61,8 +63,6 @@ public class ResponseAnalyzer {
         error.append(err_msg);
 
         errors.add(error.toString());
-
-        somethingChanged = true;
     }
 
     public void addWarning(int warn_id, String warn_msg) {
@@ -76,14 +76,6 @@ public class ResponseAnalyzer {
         warning.append(warn_msg);
 
         warnings.add(warning.toString());
-
-        somethingChanged = true;
-    }
-
-    private void setExecuted(boolean executed) {
-        this.executed = executed;
-
-        somethingChanged = true;
     }
 
     public boolean wasExecuted() {
@@ -124,10 +116,8 @@ public class ResponseAnalyzer {
         return !warnings.isEmpty();
     }
 
-    public boolean hasSomethingChanged() {
-        boolean tmp_somethingChanged = somethingChanged;
-        somethingChanged = false;
-        return tmp_somethingChanged;
+    public JSONObject getPayload() {
+        return payload;
     }
 
 }

@@ -38,7 +38,7 @@ public class ActivateAccountActivity extends Activity {
 
     private final EventBus bus = EventBus.getDefault();
 
-    private final CommunicationManager communicationManager = new CommunicationManager(); // TODO: get single manager
+    private CommunicationManager communicationManager;
     private ResponseAnalyzer responseAnalyzer;
 
 
@@ -47,6 +47,7 @@ public class ActivateAccountActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_activate_account);
 
+        communicationManager = MyApplication.getCommunicationManager();
         responseAnalyzer = communicationManager.getAccountActivationResponseAnalyzer();
     }
 

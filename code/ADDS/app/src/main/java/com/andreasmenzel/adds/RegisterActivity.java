@@ -12,7 +12,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.andreasmenzel.adds.Events.AccountRegistrationFailed;
@@ -23,20 +22,12 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-import java.io.IOException;
-
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-
 // TODO: setupCallbacks also onResume?
 public class RegisterActivity extends Activity {
 
     private final EventBus bus = EventBus.getDefault();
 
-    private final CommunicationManager communicationManager = new CommunicationManager(); // TODO: get single manager
+    private CommunicationManager communicationManager;
     private ResponseAnalyzer responseAnalyzer;
 
 
@@ -45,6 +36,7 @@ public class RegisterActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
+        communicationManager = MyApplication.getCommunicationManager();
         responseAnalyzer = communicationManager.getAccountRegistrationResponseAnalyzer();
     }
 
@@ -165,7 +157,7 @@ public class RegisterActivity extends Activity {
                 return;
             }
 
-            communicationManager.register_account(accountEmail, accountFirstname, accountLastname, accountPassword);
+            communicationManager.registerAccount(accountEmail, accountFirstname, accountLastname, accountPassword);
         } else {
             bus.post(new ToastMessage("Registration already in progress."));
         }

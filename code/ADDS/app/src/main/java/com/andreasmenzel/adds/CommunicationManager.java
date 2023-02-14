@@ -1,20 +1,23 @@
 package com.andreasmenzel.adds;
 
-import android.text.TextUtils;
-import android.widget.EditText;
-
 import androidx.annotation.NonNull;
 
 import com.andreasmenzel.adds.Events.AccountActivationFailed;
 import com.andreasmenzel.adds.Events.AccountActivationSucceededPartially;
 import com.andreasmenzel.adds.Events.AccountActivationSucceeded;
+import com.andreasmenzel.adds.Events.AccountAuthenticationFailed;
+import com.andreasmenzel.adds.Events.AccountAuthenticationSucceeded;
+import com.andreasmenzel.adds.Events.AccountAuthenticationSucceededPartially;
 import com.andreasmenzel.adds.Events.AccountRegistrationFailed;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceeded;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceededPartially;
 import com.andreasmenzel.adds.Events.UpdateAccountActivationUI;
+import com.andreasmenzel.adds.Events.UpdateAccountAuthenticationUI;
 import com.andreasmenzel.adds.Events.UpdateAccountRegistrationUI;
 
 import org.greenrobot.eventbus.EventBus;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,8 +40,10 @@ public class CommunicationManager {
     private final AtomicBoolean accountRegistrationInProgress;
     private final ResponseAnalyzer accountRegistrationResponseAnalyzer;
 
-    private final AtomicBoolean authenticationInProgress;
-    private final ResponseAnalyzer authenticationResponseAnalyzer;
+    private final AtomicBoolean accountAuthenticationInProgress;
+    private final ResponseAnalyzer accountAuthenticationResponseAnalyzer;
+    private String accountAuthenticationToken;
+    private long accountAuthenticationTokenExpire;
 
     private final AtomicBoolean accountActivationInProgress;
     private final ResponseAnalyzer accountActivationResponseAnalyzer;
@@ -54,15 +59,17 @@ public class CommunicationManager {
         accountRegistrationInProgress = new AtomicBoolean(false);
         accountRegistrationResponseAnalyzer = new ResponseAnalyzer();
 
-        authenticationInProgress = new AtomicBoolean(false);
-        authenticationResponseAnalyzer = new ResponseAnalyzer();
+        accountAuthenticationInProgress = new AtomicBoolean(false);
+        accountAuthenticationResponseAnalyzer = new ResponseAnalyzer();
+        accountAuthenticationToken = null;
+        accountAuthenticationTokenExpire = 0;
 
         accountActivationInProgress = new AtomicBoolean(false);
         accountActivationResponseAnalyzer = new ResponseAnalyzer();
     }
 
 
-    public void register_account(String email, String firstname, String lastname, String password) {
+    public void registerAccount(String email, String firstname, String lastname, String password) {
         if(accountRegistrationInProgress.compareAndSet(false, true)) {
             accountRegistrationResponseAnalyzer.reset();
             bus.post(new UpdateAccountRegistrationUI());
@@ -118,24 +125,18 @@ public class CommunicationManager {
     }
 
 
-    /*private void authenticate() {
-        if(authenticationInProgress.compareAndSet(false, true)) {
-            authenticationResponseAnalyzer.reset();
-            bus.post(new UpdateUI());
+    public void authenticateAccount(String email, String pwd_hash) {
+        authenticateAccount(email, pwd_hash, false);
+    }
 
-            EditText editText_accountActivationCode = findViewById(R.id.editText_accountActivationCode);
-
-            String accountActivationCode = editText_accountActivationCode.getText().toString();
-
-            if(TextUtils.isEmpty(accountActivationCode)) {
-                editText_accountActivationCode.setError("Please enter a valid activation code.");
-
-                authenticationInProgress.set(false);
-                return;
-            }
+    // TODO: implement autoAuthenticate
+    public void authenticateAccount(String email, String pwd_hash, boolean autoAuthenticate) {
+        if(accountAuthenticationInProgress.compareAndSet(false, true)) {
+            accountAuthenticationResponseAnalyzer.reset();
+            bus.post(new UpdateAccountAuthenticationUI());
 
             Request request = new Request.Builder()
-                    .url(activateAccountUrl + "account/activate?activation_code=" + accountActivationCode)
+                    .url(userManagementSystemUrl + "authentication/authenticate?email=" + email + "&pwd_hash=" + pwd_hash)
                     .build();
 
             OkHttpClient client = new OkHttpClient();
@@ -143,10 +144,9 @@ public class CommunicationManager {
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                    authenticationResponseAnalyzer.addError(-1, "Activation failed: Cannot reach server.");
-                    bus.post(new UpdateUI());
-
-                    authenticationInProgress.set(false);
+                    accountAuthenticationResponseAnalyzer.addError(-1, "Authentication failed: Cannot reach server.");
+                    accountAuthenticationInProgress.set(false);
+                    bus.post(new AccountAuthenticationFailed());
                 }
 
                 @Override
@@ -154,30 +154,54 @@ public class CommunicationManager {
                     if(response.isSuccessful()) {
                         String myResponse = response.body().string();
 
-                        authenticationResponseAnalyzer.analyze(myResponse);
+                        accountAuthenticationResponseAnalyzer.analyze(myResponse);
 
-                        if(authenticationResponseAnalyzer.hasSomethingChanged()) {
-                            bus.post(new UpdateUI());
-                        }
+                        if(accountAuthenticationResponseAnalyzer.wasExecuted()) {
+                            JSONObject responsePayload = accountAuthenticationResponseAnalyzer.getPayload();
+                            String authenticationToken = null;
+                            long authenticationTokenExpire = 0;
+                            if(responsePayload != null && responsePayload.has("auth_token") && responsePayload.has("exp")) {
+                                try {
+                                    authenticationToken = responsePayload.getString("auth_token");
+                                    authenticationTokenExpire = responsePayload.getLong("exp");
+                                } catch (JSONException e) {
+                                    bus.post(new ToastMessage(e.getMessage()));
+                                }
+                            }
 
-                        if(authenticationResponseAnalyzer.wasExecuted()) {
-                            bus.post(new ToastMessage("Account successfully activated!"));
-                            finish();
+                            if(authenticationToken != null && authenticationTokenExpire > 0) {
+                                accountEmail = email;
+                                accountPwdHash = pwd_hash;
+                                accountAuthenticationToken = authenticationToken;
+                                accountAuthenticationTokenExpire = authenticationTokenExpire;
+
+                                if(accountAuthenticationResponseAnalyzer.hasErrors() || accountAuthenticationResponseAnalyzer.hasWarnings()) {
+                                    accountAuthenticationInProgress.set(false);
+                                    bus.post(new AccountAuthenticationSucceededPartially());
+                                } else {
+                                    accountAuthenticationInProgress.set(false);
+                                    bus.post(new AccountAuthenticationSucceeded());
+                                }
+                            } else {
+                                accountAuthenticationInProgress.set(false);
+                                accountAuthenticationResponseAnalyzer.addError(-1, "Authentication failed: authentication token or expire time missing");
+                                bus.post(new AccountAuthenticationFailed());
+                            }
                         } else {
-                            bus.post(new ToastMessage("Account not activated."));
+                            accountAuthenticationInProgress.set(false);
+                            bus.post(new AccountAuthenticationFailed());
                         }
                     } else {
-                        authenticationResponseAnalyzer.addError(-1, "Activation failed: unknown cause (notSuccessful)");
-                        bus.post(new UpdateUI());
+                        accountAuthenticationInProgress.set(false);
+                        accountAuthenticationResponseAnalyzer.addError(-1, "Authentication failed: unknown cause (notSuccessful)");
+                        bus.post(new AccountAuthenticationFailed());
                     }
-
-                    authenticationInProgress.set(false);
                 }
             });
         } else {
             // TODO: Log?
         }
-    }*/
+    }
 
 
     public void activateAccount(String accountActivationCode) {
@@ -239,12 +263,12 @@ public class CommunicationManager {
         return accountRegistrationResponseAnalyzer;
     }
 
-    public AtomicBoolean getAuthenticationInProgress() {
-        return authenticationInProgress;
+    public AtomicBoolean getAccountAuthenticationInProgress() {
+        return accountAuthenticationInProgress;
     }
 
-    public ResponseAnalyzer getAuthenticationResponseAnalyzer() {
-        return authenticationResponseAnalyzer;
+    public ResponseAnalyzer getAccountAuthenticationResponseAnalyzer() {
+        return accountAuthenticationResponseAnalyzer;
     }
 
     public AtomicBoolean getAccountActivationInProgress() {
