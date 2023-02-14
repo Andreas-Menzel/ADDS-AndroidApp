@@ -30,9 +30,15 @@
                 android:value="" />
         </activity>
 
-        <activity android:name=".RegisterActivity"/>
-        <activity android:name=".LoginActivity"/>
-        <activity android:name=".ActivateAccountActivity"/>
+        <activity android:name=".RegisterActivity"
+            android:screenOrientation="portrait"/>
+
+        <activity android:name=".LoginActivity"
+            android:screenOrientation="portrait"/>
+
+        <activity android:name=".ActivateAccountActivity"
+            android:screenOrientation="portrait"/>
+
     </application>
 
 </manifest>

@@ -5,8 +5,16 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.Toast;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final EventBus bus = EventBus.getDefault();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -20,6 +28,21 @@ public class MainActivity extends AppCompatActivity {
 
         setupUICallbacks();
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        bus.register(this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        bus.unregister(this);
+    }
+
 
     private void setupUICallbacks() {
         findViewById(R.id.btn_showActivateAccountActivity).setOnClickListener((View v) -> {
@@ -37,4 +60,14 @@ public class MainActivity extends AppCompatActivity {
             startActivity(switchActivityIntent);
         });
     }
+
+
+    /**
+     * Shows a toast message.
+     */
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void showToast(ToastMessage toastMessage) {
+        Toast.makeText(getApplicationContext(), toastMessage.getMessage(), Toast.LENGTH_LONG).show();
+    }
+
 }

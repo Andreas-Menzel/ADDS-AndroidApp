@@ -2,6 +2,7 @@ package com.andreasmenzel.adds;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -13,6 +14,10 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.andreasmenzel.adds.Events.AccountActivationFailed;
+import com.andreasmenzel.adds.Events.AccountActivationSucceeded;
+import com.andreasmenzel.adds.Events.AccountActivationSucceededPartially;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -29,22 +34,20 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 // TODO: setupCallbacks also onResume?
-// TODO: onResume: response missed?
 public class ActivateAccountActivity extends Activity {
 
-    private final String activateAccountUrl = "http://adds-demo.an-men.de/";
+    private final EventBus bus = EventBus.getDefault();
 
-    private final EventBus bus = new EventBus();
-
-    private final AtomicBoolean activationInProgress = new AtomicBoolean(false);
-
-    private final ResponseAnalyzer responseAnalyzer = new ResponseAnalyzer();
+    private final CommunicationManager communicationManager = new CommunicationManager(); // TODO: get single manager
+    private ResponseAnalyzer responseAnalyzer;
 
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_activate_account);
+
+        responseAnalyzer = communicationManager.getAccountActivationResponseAnalyzer();
     }
 
     @Override
@@ -59,6 +62,7 @@ public class ActivateAccountActivity extends Activity {
         super.onResume();
 
         bus.register(this);
+        updateUI(null);
     }
 
     @Override
@@ -79,87 +83,62 @@ public class ActivateAccountActivity extends Activity {
     }
 
 
-    @Subscribe(threadMode = ThreadMode.MAIN)
+    @Subscribe
     public void updateUI(UpdateUI event) {
-        TextView txtView_activateAccountErrors = findViewById(R.id.txtView_activateAccountErrors);
-        TextView txtView_activateAccountWarnings = findViewById(R.id.txtView_activateAccountWarnings);
+        runOnUiThread(() -> {
+            TextView txtView_activateAccountErrors = findViewById(R.id.txtView_activateAccountErrors);
+            TextView txtView_activateAccountWarnings = findViewById(R.id.txtView_activateAccountWarnings);
 
-        String errors_string = responseAnalyzer.getErrorsString();
-        if(errors_string != null) {
-            txtView_activateAccountErrors.setText(errors_string);
-            txtView_activateAccountErrors.setVisibility(View.VISIBLE);
-        } else {
-            txtView_activateAccountErrors.setVisibility(View.GONE);
-            txtView_activateAccountErrors.setText("");
-        }
+            String errors_string = responseAnalyzer.getErrorsString();
+            if(errors_string != null) {
+                txtView_activateAccountErrors.setText(errors_string);
+                txtView_activateAccountErrors.setVisibility(View.VISIBLE);
+            } else {
+                txtView_activateAccountErrors.setVisibility(View.GONE);
+                txtView_activateAccountErrors.setText("");
+            }
 
-        String warnings_string = responseAnalyzer.getWarningsString();
-        if(warnings_string != null) {
-            txtView_activateAccountWarnings.setText(warnings_string);
-            txtView_activateAccountWarnings.setVisibility(View.VISIBLE);
-        } else {
-            txtView_activateAccountWarnings.setVisibility(View.GONE);
-            txtView_activateAccountWarnings.setText("");
-        }
+            String warnings_string = responseAnalyzer.getWarningsString();
+            if(warnings_string != null) {
+                txtView_activateAccountWarnings.setText(warnings_string);
+                txtView_activateAccountWarnings.setVisibility(View.VISIBLE);
+            } else {
+                txtView_activateAccountWarnings.setVisibility(View.GONE);
+                txtView_activateAccountWarnings.setText("");
+            }
+        });
+    }
+
+
+    @Subscribe
+    public void accountActivationSucceeded(AccountActivationSucceeded event) {
+        finish();
+    }
+
+    @Subscribe
+    public void accountActivationSucceededPartially(AccountActivationSucceededPartially event) {
+        bus.post(new ToastMessage("Account activated!"));
+        updateUI(null);
+    }
+
+    @Subscribe
+    public void accountActivationFailed(AccountActivationFailed event) {
+        updateUI(null);
     }
 
     
     public void activateAccount() {
-        if(activationInProgress.compareAndSet(false, true)) {
-            responseAnalyzer.reset();
-            bus.post(new UpdateUI());
-
+        if(!communicationManager.getAccountActivationInProgress().get()) {
             EditText editText_accountActivationCode = findViewById(R.id.editText_accountActivationCode);
 
             String accountActivationCode = editText_accountActivationCode.getText().toString();
 
             if(TextUtils.isEmpty(accountActivationCode)) {
                 editText_accountActivationCode.setError("Please enter a valid activation code.");
-
-                activationInProgress.set(false);
                 return;
             }
 
-            Request request = new Request.Builder()
-                    .url(activateAccountUrl + "account/activate?activation_code=" + accountActivationCode)
-                    .build();
-
-            OkHttpClient client = new OkHttpClient();
-
-            client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                    responseAnalyzer.addError(-1, "Activation failed: Cannot reach server.");
-                    bus.post(new UpdateUI());
-
-                    activationInProgress.set(false);
-                }
-
-                @Override
-                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                    if(response.isSuccessful()) {
-                        String myResponse = response.body().string();
-
-                        responseAnalyzer.analyze(myResponse);
-
-                        if(responseAnalyzer.hasSomethingChanged()) {
-                            bus.post(new UpdateUI());
-                        }
-
-                        if(responseAnalyzer.wasExecuted()) {
-                            bus.post(new ToastMessage("Account successfully activated!"));
-                            finish();
-                        } else {
-                            bus.post(new ToastMessage("Account not activated."));
-                        }
-                    } else {
-                        responseAnalyzer.addError(-1, "Activation failed: unknown cause (notSuccessful)");
-                        bus.post(new UpdateUI());
-                    }
-
-                    activationInProgress.set(false);
-                }
-            });
+            communicationManager.activateAccount(accountActivationCode);
         } else {
             bus.post(new ToastMessage("Activation already in progress."));
         }

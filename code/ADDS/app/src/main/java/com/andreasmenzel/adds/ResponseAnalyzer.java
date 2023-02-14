@@ -116,6 +116,14 @@ public class ResponseAnalyzer {
         return warnings_string.toString();
     }
 
+    public boolean hasErrors() {
+        return !errors.isEmpty();
+    }
+
+    public boolean hasWarnings() {
+        return !warnings.isEmpty();
+    }
+
     public boolean hasSomethingChanged() {
         boolean tmp_somethingChanged = somethingChanged;
         somethingChanged = false;
