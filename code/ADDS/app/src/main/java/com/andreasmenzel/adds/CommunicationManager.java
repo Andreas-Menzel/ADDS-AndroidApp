@@ -11,6 +11,7 @@ import com.andreasmenzel.adds.Events.AccountAuthenticationSucceededPartially;
 import com.andreasmenzel.adds.Events.AccountRegistrationFailed;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceeded;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceededPartially;
+import com.andreasmenzel.adds.Events.Event;
 import com.andreasmenzel.adds.Events.ToastMessage;
 import com.andreasmenzel.adds.Events.UpdateAccountActivationUI;
 import com.andreasmenzel.adds.Events.UpdateAccountAuthenticationUI;
@@ -21,6 +22,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import okhttp3.Call;
@@ -52,6 +54,30 @@ public class CommunicationManager {
     private final AtomicBoolean accountActivationInProgress;
     private final ResponseAnalyzer accountActivationResponseAnalyzer;
 
+    enum RequestType {
+        registerAccount {
+            @NonNull
+            @Override
+            public String toString() {
+                return "Account Registration";
+            }
+        },
+        authenticateAccount {
+            @NonNull
+            @Override
+            public String toString() {
+                return "Account Authentication";
+            }
+        },
+        activateAccount {
+            @NonNull
+            @Override
+            public String toString() {
+                return "Account Activation";
+            }
+        }
+    }
+
 
     /**
      * Sets up the event bus and all variables.
@@ -76,6 +102,117 @@ public class CommunicationManager {
 
 
     /**
+     * Sends a request.
+     *
+     * @param requestType One of the RequestTypes: registerAccount | authenticateAccount |
+     *                    activateAccount.
+     * @param requestUrl The URL with parameters.
+     * @param checkPayloadCallable Callable that checks the payload. Has to return a Boolean. Can be
+     *                             null.
+     */
+    public void sendRequest(RequestType requestType, String requestUrl, Callable<Boolean> checkPayloadCallable) {
+        Request request = new Request.Builder()
+                .url(requestUrl)
+                .build();
+
+        OkHttpClient client = new OkHttpClient();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                AtomicBoolean inProgress = null;
+                ResponseAnalyzer responseAnalyzer = null;
+                Event event = null;
+
+                switch(requestType) {
+                    case registerAccount:
+                        inProgress = accountRegistrationInProgress;
+                        responseAnalyzer = accountRegistrationResponseAnalyzer;
+                        event = new AccountRegistrationFailed();
+                        break;
+                    case authenticateAccount:
+                        inProgress = accountAuthenticationInProgress;
+                        responseAnalyzer = accountAuthenticationResponseAnalyzer;
+                        event = new AccountAuthenticationFailed();
+                        break;
+                    case activateAccount:
+                        inProgress = accountActivationInProgress;
+                        responseAnalyzer = accountActivationResponseAnalyzer;
+                        event = new AccountActivationFailed();
+                        break;
+                }
+
+                responseAnalyzer.addError(-1, requestType.toString() + " failed: Cannot reach server.");
+                inProgress.set(false);
+                bus.post(event);
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                AtomicBoolean inProgress = null;
+                ResponseAnalyzer responseAnalyzer = null;
+                Event eventSucceeded = null;
+                Event eventSucceededPartially = null;
+                Event eventFailed = null;
+
+                switch(requestType) {
+                    case registerAccount:
+                        inProgress = accountRegistrationInProgress;
+                        responseAnalyzer = accountRegistrationResponseAnalyzer;
+                        eventSucceeded = new AccountRegistrationSucceeded();
+                        eventSucceededPartially = new AccountRegistrationSucceededPartially();
+                        eventFailed = new AccountRegistrationFailed();
+                        break;
+                    case authenticateAccount:
+                        inProgress = accountAuthenticationInProgress;
+                        responseAnalyzer = accountAuthenticationResponseAnalyzer;
+                        eventSucceeded = new AccountAuthenticationSucceeded();
+                        eventSucceededPartially = new AccountAuthenticationSucceededPartially();
+                        eventFailed = new AccountAuthenticationFailed();
+                        break;
+                }
+
+                if(response.isSuccessful()) {
+                    String myResponse = response.body().string();
+
+                    responseAnalyzer.analyze(myResponse);
+
+                    if(responseAnalyzer.wasExecuted()) {
+                        boolean payloadOk = true;
+                        if(checkPayloadCallable != null) {
+                            try {
+                                payloadOk = (boolean)checkPayloadCallable.call();
+                            } catch (Exception e) {
+                                payloadOk = false;
+                            }
+                        }
+
+                        if(payloadOk) {
+                            if(responseAnalyzer.hasErrors() || responseAnalyzer.hasWarnings()) {
+                                inProgress.set(false);
+                                bus.post(eventSucceededPartially);
+                            } else {
+                                inProgress.set(false);
+                                bus.post(eventSucceeded);
+                            }
+                        } else {
+                            inProgress.set(false);
+                            bus.post(eventFailed);
+                        }
+                    } else {
+                        inProgress.set(false);
+                        bus.post(eventFailed);
+                    }
+                } else {
+                    inProgress.set(false);
+                    responseAnalyzer.addError(-1, requestType.toString() + " failed: unknown cause (notSuccessful)");
+                    bus.post(eventFailed);
+                }
+            }
+        });
+    }
+
+    /**
      * Creates an account by sending a request to the User Management System.
      * Posts one of three events on the bus, depending on the success of the request:
      * AccountRegistrationSucceeded, AccountRegistrationSucceededPartially or
@@ -96,46 +233,8 @@ public class CommunicationManager {
             String pwd_salt = "my_pwd_salt";
             String pwd_hash = "my_pws_hash";
 
-            Request request = new Request.Builder()
-                    .url(userManagementSystemUrl + "account/create?email=" + email + "&firstname=" + firstname + "&lastname=" + lastname + "&pwd_salt=" + pwd_salt + "&pwd_hash=" + pwd_hash)
-                    .build();
-
-            OkHttpClient client = new OkHttpClient();
-
-            client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                    accountRegistrationResponseAnalyzer.addError(-1, "Registration failed: Cannot reach server.");
-                    accountRegistrationInProgress.set(false);
-                    bus.post(new AccountRegistrationFailed());
-                }
-
-                @Override
-                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                    if(response.isSuccessful()) {
-                        String myResponse = response.body().string();
-
-                        accountRegistrationResponseAnalyzer.analyze(myResponse);
-
-                        if(accountRegistrationResponseAnalyzer.wasExecuted()) {
-                            if(accountRegistrationResponseAnalyzer.hasErrors() || accountRegistrationResponseAnalyzer.hasWarnings()) {
-                                accountRegistrationInProgress.set(false);
-                                bus.post(new AccountRegistrationSucceededPartially());
-                            } else {
-                                accountRegistrationInProgress.set(false);
-                                bus.post(new AccountRegistrationSucceeded());
-                            }
-                        } else {
-                            accountRegistrationInProgress.set(false);
-                            bus.post(new AccountRegistrationFailed());
-                        }
-                    } else {
-                        accountRegistrationInProgress.set(false);
-                        accountRegistrationResponseAnalyzer.addError(-1, "Registration failed: unknown cause (notSuccessful)");
-                        bus.post(new AccountRegistrationFailed());
-                    }
-                }
-            });
+            String url = userManagementSystemUrl + "account/create?email=" + email + "&firstname=" + firstname + "&lastname=" + lastname + "&pwd_salt=" + pwd_salt + "&pwd_hash=" + pwd_hash;
+            sendRequest(RequestType.registerAccount, url, null);
         } else {
             // TODO: Log?
         }
@@ -170,69 +269,36 @@ public class CommunicationManager {
             accountAuthenticationResponseAnalyzer.reset();
             bus.post(new UpdateAccountAuthenticationUI());
 
-            Request request = new Request.Builder()
-                    .url(userManagementSystemUrl + "authentication/authenticate?email=" + email + "&pwd_hash=" + pwd_hash)
-                    .build();
-
-            OkHttpClient client = new OkHttpClient();
-
-            client.newCall(request).enqueue(new Callback() {
+            String url = userManagementSystemUrl + "authentication/authenticate?email=" + email + "&pwd_hash=" + pwd_hash;
+            Callable<Boolean> checkPayloadCallable = new Callable() {
                 @Override
-                public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                    accountAuthenticationResponseAnalyzer.addError(-1, "Authentication failed: Cannot reach server.");
-                    accountAuthenticationInProgress.set(false);
-                    bus.post(new AccountAuthenticationFailed());
-                }
-
-                @Override
-                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                    if(response.isSuccessful()) {
-                        String myResponse = response.body().string();
-
-                        accountAuthenticationResponseAnalyzer.analyze(myResponse);
-
-                        if(accountAuthenticationResponseAnalyzer.wasExecuted()) {
-                            JSONObject responsePayload = accountAuthenticationResponseAnalyzer.getPayload();
-                            String authenticationToken = null;
-                            long authenticationTokenExpire = 0;
-                            if(responsePayload != null && responsePayload.has("auth_token") && responsePayload.has("exp")) {
-                                try {
-                                    authenticationToken = responsePayload.getString("auth_token");
-                                    authenticationTokenExpire = responsePayload.getLong("exp");
-                                } catch (JSONException e) {
-                                    bus.post(new ToastMessage(e.getMessage()));
-                                }
-                            }
-
-                            if(authenticationToken != null && authenticationTokenExpire > 0) {
-                                accountEmail = email;
-                                accountPwdHash = pwd_hash;
-                                accountAuthenticationToken = authenticationToken;
-                                accountAuthenticationTokenExpire = authenticationTokenExpire;
-
-                                if(accountAuthenticationResponseAnalyzer.hasErrors() || accountAuthenticationResponseAnalyzer.hasWarnings()) {
-                                    accountAuthenticationInProgress.set(false);
-                                    bus.post(new AccountAuthenticationSucceededPartially());
-                                } else {
-                                    accountAuthenticationInProgress.set(false);
-                                    bus.post(new AccountAuthenticationSucceeded());
-                                }
-                            } else {
-                                accountAuthenticationInProgress.set(false);
-                                accountAuthenticationResponseAnalyzer.addError(-1, "Authentication failed: authentication token or expire time missing");
-                                bus.post(new AccountAuthenticationFailed());
-                            }
-                        } else {
-                            accountAuthenticationInProgress.set(false);
-                            bus.post(new AccountAuthenticationFailed());
+                public Boolean call() throws Exception {
+                    JSONObject responsePayload = accountAuthenticationResponseAnalyzer.getPayload();
+                    String authenticationToken = null;
+                    long authenticationTokenExpire = 0;
+                    if(responsePayload != null && responsePayload.has("auth_token") && responsePayload.has("exp")) {
+                        try {
+                            authenticationToken = responsePayload.getString("auth_token");
+                            authenticationTokenExpire = responsePayload.getLong("exp");
+                        } catch (JSONException e) {
+                            bus.post(new ToastMessage(e.getMessage()));
                         }
-                    } else {
-                        accountAuthenticationInProgress.set(false);
-                        accountAuthenticationResponseAnalyzer.addError(-1, "Authentication failed: unknown cause (notSuccessful)");
-                        bus.post(new AccountAuthenticationFailed());
                     }
+
+                    if(authenticationToken != null && authenticationTokenExpire > 0) {
+                        accountEmail = email;
+                        accountPwdHash = pwd_hash;
+                        accountAuthenticationToken = authenticationToken;
+                        accountAuthenticationTokenExpire = authenticationTokenExpire;
+
+                        return true;
+                    }
+
+                    accountAuthenticationResponseAnalyzer.addError(-1, "Authentication failed: authentication token or expire time missing or invalid");
+                    return false;
                 }
-            });
+            };
+            sendRequest(RequestType.authenticateAccount, url, checkPayloadCallable);
         } else {
             // TODO: Log?
         }
@@ -251,46 +317,8 @@ public class CommunicationManager {
             accountActivationResponseAnalyzer.reset();
             bus.post(new UpdateAccountActivationUI());
 
-            Request request = new Request.Builder()
-                    .url(userManagementSystemUrl + "account/activate?activation_code=" + accountActivationCode)
-                    .build();
-
-            OkHttpClient client = new OkHttpClient();
-
-            client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                    accountActivationResponseAnalyzer.addError(-1, "Activation failed: Cannot reach server.");
-                    accountActivationInProgress.set(false);
-                    bus.post(new AccountActivationFailed());
-                }
-
-                @Override
-                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                    if(response.isSuccessful()) {
-                        String myResponse = response.body().string();
-
-                        accountActivationResponseAnalyzer.analyze(myResponse);
-
-                        if(accountActivationResponseAnalyzer.wasExecuted()) {
-                            if(accountActivationResponseAnalyzer.hasErrors() || accountActivationResponseAnalyzer.hasWarnings()) {
-                                accountActivationInProgress.set(false);
-                                bus.post(new AccountActivationSucceededPartially());
-                            } else {
-                                accountActivationInProgress.set(false);
-                                bus.post(new AccountActivationSucceeded());
-                            }
-                        } else {
-                            accountActivationInProgress.set(false);
-                            bus.post(new AccountActivationFailed());
-                        }
-                    } else {
-                        accountActivationInProgress.set(false);
-                        accountActivationResponseAnalyzer.addError(-1, "Activation failed: unknown cause (notSuccessful)");
-                        bus.post(new AccountActivationFailed());
-                    }
-                }
-            });
+            String url = userManagementSystemUrl + "account/activate?activation_code=" + accountActivationCode;
+            sendRequest(RequestType.activateAccount, url, null);
         } else {
             // TODO: Log?
         }
