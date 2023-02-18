@@ -61,6 +61,11 @@ public class MainActivity extends AppCompatActivity {
             Intent switchActivityIntent = new Intent(this, LoginActivity.class);
             startActivity(switchActivityIntent);
         });
+
+        findViewById(R.id.btn_showProductInfoActivity).setOnClickListener((View v) -> {
+            Intent switchActivityIntent = new Intent(this, ProductInfoActivity.class);
+            startActivity(switchActivityIntent);
+        });
     }
 
 

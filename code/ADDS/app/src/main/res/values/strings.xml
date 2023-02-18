@@ -16,4 +16,9 @@
 
     <string name="already_have_an_account">Already have an account?</string>
     <string name="dont_have_an_account_yet">Don\'t have an account yet?</string>
+
+    <string name="product_info_default_name">#Product Name#</string>
+    <string name="product_info_default_id">#Product ID#</string>
+    <string name="product_info_label_description">Description</string>
+    <string name="product_info_default_description">#Product Description#</string>
 </resources>

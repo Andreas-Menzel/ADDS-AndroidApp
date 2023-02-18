@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingVertical="32dp"
+        android:paddingHorizontal="24dp">
+
+        <TextView
+            android:id="@+id/txtView_productInfoName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/product_info_default_name"
+            android:textSize="32sp"/>
+
+        <TextView
+            android:id="@+id/txtView_productInfoID"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/product_info_default_id"
+            android:layout_marginBottom="32dp" />
+
+        <TextView
+            android:id="@+id/txtView_label_productInfoDescription"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/product_info_label_description"
+            android:textSize="20sp"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:id="@+id/txtView_productInfoDescription"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/product_info_default_description" />
+
+    </LinearLayout>
+
+</ScrollView>

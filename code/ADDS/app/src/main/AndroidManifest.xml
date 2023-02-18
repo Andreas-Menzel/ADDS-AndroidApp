@@ -40,6 +40,9 @@
         <activity android:name=".ActivateAccountActivity"
             android:screenOrientation="portrait"/>
 
+        <activity android:name=".ProductInfoActivity"
+            android:screenOrientation="portrait"/>
+
     </application>
 
 </manifest>
