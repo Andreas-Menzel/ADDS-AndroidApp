@@ -13,6 +13,17 @@ public class Product {
     private String name;
     private String description;
 
+    private String warehouseID = null;
+    private int quantity = -1;
+
+
+    public Product(String id, String warehouseID) {
+        communicationManager = MyApplication.getCommunicationManagerProductNotNull(this);
+        responseAnalyzer = communicationManager.getResponseAnalyzer();
+
+        this.id = id;
+        this.warehouseID = warehouseID;
+    }
 
     public Product(String id, String name, String description) {
         communicationManager = MyApplication.getCommunicationManagerProductNotNull(this);

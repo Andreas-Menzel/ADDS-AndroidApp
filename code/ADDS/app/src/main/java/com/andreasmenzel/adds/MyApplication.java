@@ -1,6 +1,7 @@
 package com.andreasmenzel.adds;
 
 import com.andreasmenzel.adds.DataClasses.Product;
+import com.andreasmenzel.adds.DataClasses.ProductList;
 import com.andreasmenzel.adds.Manager.CommunicationManager;
 
 public class MyApplication extends android.app.Application {
@@ -10,6 +11,7 @@ public class MyApplication extends android.app.Application {
     private static CommunicationManager communicationManagerAuthenticateAccount = null;
 
     private static CommunicationManager communicationManagerProduct = null;
+    private static CommunicationManager communicationManagerProductList = null;
 
 
     public MyApplication() {
@@ -31,5 +33,9 @@ public class MyApplication extends android.app.Application {
 
     public static CommunicationManager getCommunicationManagerProductNotNull(Product product) {
         return communicationManagerProduct != null ? communicationManagerProduct : new CommunicationManager(product);
+    }
+
+    public static CommunicationManager getCommunicationManagerProductListNotNull(ProductList productList) {
+        return communicationManagerProductList != null ? communicationManagerProductList : new CommunicationManager(productList);
     }
 }

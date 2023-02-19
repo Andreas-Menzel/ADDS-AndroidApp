@@ -3,6 +3,7 @@ package com.andreasmenzel.adds.Manager;
 import androidx.annotation.NonNull;
 
 import com.andreasmenzel.adds.DataClasses.Product;
+import com.andreasmenzel.adds.DataClasses.ProductList;
 import com.andreasmenzel.adds.Events.AccountActivationFailed;
 import com.andreasmenzel.adds.Events.AccountActivationSucceeded;
 import com.andreasmenzel.adds.Events.AccountActivationSucceededPartially;
@@ -16,14 +17,19 @@ import com.andreasmenzel.adds.Events.Event;
 import com.andreasmenzel.adds.Events.FetchProductInfoFailed;
 import com.andreasmenzel.adds.Events.FetchProductInfoSucceeded;
 import com.andreasmenzel.adds.Events.FetchProductInfoSucceededPartially;
+import com.andreasmenzel.adds.Events.FetchProductListFailed;
+import com.andreasmenzel.adds.Events.FetchProductListSucceeded;
+import com.andreasmenzel.adds.Events.FetchProductListSucceededPartially;
 import com.andreasmenzel.adds.Events.ToastMessage;
 import com.andreasmenzel.adds.Events.UpdateAccountActivationUI;
 import com.andreasmenzel.adds.Events.UpdateAccountAuthenticationUI;
 import com.andreasmenzel.adds.Events.UpdateAccountRegistrationUI;
 import com.andreasmenzel.adds.Events.UpdateProductInfoUI;
+import com.andreasmenzel.adds.Events.UpdateProductListUI;
 import com.andreasmenzel.adds.ResponseAnalyzer;
 
 import org.greenrobot.eventbus.EventBus;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -80,6 +86,7 @@ public class CommunicationManager {
             return false;
         }
     };
+
     private final Callable<Boolean> fetchProductProcessPayload = new Callable() {
         @Override
         public Boolean call() throws Exception {
@@ -112,6 +119,53 @@ public class CommunicationManager {
             return false;
         }
     };
+    // TODO: quantity
+    private final Callable<Boolean> fetchProductListProcessPayload = new Callable() {
+        @Override
+        public Boolean call() throws Exception {
+            JSONObject responsePayload = responseAnalyzer.getPayload();
+
+            JSONArray stocks = null;
+            if(responsePayload != null && responsePayload.has("stocks")) {
+                try {
+                    stocks = responsePayload.getJSONArray("stocks");
+                } catch (JSONException e) {
+                    // TODO: Error / Log?
+                    bus.post(new ToastMessage(e.getMessage()));
+                }
+            }
+
+            if(stocks != null) {
+                if(productList != null) {
+                    productList.clearProducts();
+                    for(int i = 0; i < stocks.length(); ++i) {
+                        String productID = null;
+                        String warehouseID = null;
+
+                        try {
+                            productID = stocks.getJSONObject(i).getString("product_id");
+                            warehouseID = stocks.getJSONObject(i).getString("warehouse_id");
+
+                            Product product = new Product(productID, warehouseID);
+                            product.updateProductInfo();
+                            productList.addProduct(product);
+                        } catch (JSONException e) {
+                            // TODO: Error / Log?
+                            bus.post(new ToastMessage(e.getMessage()));
+                        }
+                    }
+
+                    bus.post(new UpdateProductListUI());
+                }
+
+                return true;
+            }
+
+            responseAnalyzer.addError(-1, "Fetching product list failed: response incomplete or invalid");
+            return false;
+        }
+    };
+
 
     public enum RequestTypes {
         registerAccount {
@@ -139,7 +193,14 @@ public class CommunicationManager {
             @NonNull
             @Override
             public String toString() {
-                return "Product";
+                return "Fetch product";
+            }
+        },
+        fetchProductList {
+            @NonNull
+            @Override
+            public String toString() {
+                return "Fetch product list";
             }
         }
     }
@@ -147,12 +208,23 @@ public class CommunicationManager {
     private RequestTypes requestType;
 
 
-    Product product;
+    Product product = null;
+    ProductList productList = null;
 
 
     public CommunicationManager(Product product) {
         this.product = product;
         requestType = RequestTypes.fetchProduct;
+
+        bus = EventBus.getDefault();
+
+        inProgress = new AtomicBoolean(false);
+        responseAnalyzer = new ResponseAnalyzer();
+    }
+
+    public CommunicationManager(ProductList productList) {
+        this.productList = productList;
+        requestType = RequestTypes.fetchProductList;
 
         bus = EventBus.getDefault();
 
@@ -204,6 +276,9 @@ public class CommunicationManager {
                     case fetchProduct:
                         eventFailed = new FetchProductInfoFailed();
                         break;
+                    case fetchProductList:
+                        eventFailed = new FetchProductListFailed();
+                        break;
                 }
 
                 responseAnalyzer.addError(-1, requestType.toString() + " failed: Cannot reach server.");
@@ -240,6 +315,12 @@ public class CommunicationManager {
                         eventSucceededPartially = new FetchProductInfoSucceededPartially();
                         eventFailed = new FetchProductInfoFailed();
                         checkPayloadCallable = fetchProductProcessPayload;
+                        break;
+                    case fetchProductList:
+                        eventSucceeded = new FetchProductListSucceeded();
+                        eventSucceededPartially = new FetchProductListSucceededPartially();
+                        eventFailed = new FetchProductListFailed();
+                        checkPayloadCallable = fetchProductListProcessPayload;
                         break;
                 }
 
@@ -366,6 +447,24 @@ public class CommunicationManager {
             bus.post(new UpdateProductInfoUI());
 
             String requestUrl = BookingSystemUrl + "api/product_info?id=" + productId;
+            sendRequest(requestUrl);
+        } else {
+            // TODO: Log?
+        }
+    }
+
+
+    /**
+     * Updates the list of products of a warehouse.
+     *
+     * @param warehouseId The id of the warehouse.
+     */
+    public void updateProductList(String warehouseId) {
+        if(inProgress.compareAndSet(false, true)) {
+            responseAnalyzer.reset();
+            bus.post(new UpdateProductListUI());
+
+            String requestUrl = BookingSystemUrl + "api/stocks?warehouse_id=" + warehouseId;
             sendRequest(requestUrl);
         } else {
             // TODO: Log?

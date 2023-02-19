@@ -43,6 +43,9 @@
         <activity android:name=".ProductInfoActivity"
             android:screenOrientation="portrait"/>
 
+        <activity android:name=".ProductListActivity"
+            android:screenOrientation="portrait"/>
+
     </application>
 
 </manifest>
