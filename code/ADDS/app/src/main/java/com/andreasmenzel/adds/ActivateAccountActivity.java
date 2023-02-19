@@ -17,6 +17,7 @@ import com.andreasmenzel.adds.Events.AccountActivationFailed;
 import com.andreasmenzel.adds.Events.AccountActivationSucceeded;
 import com.andreasmenzel.adds.Events.AccountActivationSucceededPartially;
 import com.andreasmenzel.adds.Events.ToastMessage;
+import com.andreasmenzel.adds.Manager.CommunicationManager;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -41,8 +42,8 @@ public class ActivateAccountActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_activate_account);
 
-        communicationManager = MyApplication.getCommunicationManager();
-        responseAnalyzer = communicationManager.getAccountActivationResponseAnalyzer();
+        communicationManager = MyApplication.getCommunicationManagerActivateAccountNotNull();
+        responseAnalyzer = communicationManager.getResponseAnalyzer();
     }
 
     /**
@@ -156,7 +157,7 @@ public class ActivateAccountActivity extends Activity {
      * Starts the account activation process with the in the text fields provided information.
      */
     public void activateAccount() {
-        if(!communicationManager.getAccountActivationInProgress().get()) {
+        if(!communicationManager.inProgress().get()) {
             EditText editText_accountActivationCode = findViewById(R.id.editText_accountActivationCode);
 
             String accountActivationCode = editText_accountActivationCode.getText().toString();

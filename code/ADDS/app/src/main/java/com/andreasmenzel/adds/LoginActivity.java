@@ -18,12 +18,11 @@ import com.andreasmenzel.adds.Events.AccountAuthenticationFailed;
 import com.andreasmenzel.adds.Events.AccountAuthenticationSucceeded;
 import com.andreasmenzel.adds.Events.AccountAuthenticationSucceededPartially;
 import com.andreasmenzel.adds.Events.ToastMessage;
+import com.andreasmenzel.adds.Manager.CommunicationManager;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
-
-import java.security.Timestamp;
 
 // TODO: setupCallbacks also onResume?
 public class LoginActivity extends Activity {
@@ -44,8 +43,8 @@ public class LoginActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        communicationManager = MyApplication.getCommunicationManager();
-        responseAnalyzer = communicationManager.getAccountAuthenticationResponseAnalyzer();
+        communicationManager = MyApplication.getCommunicationManagerAuthenticateAccountNotNull();
+        responseAnalyzer = communicationManager.getResponseAnalyzer();
     }
 
     /**
@@ -66,10 +65,11 @@ public class LoginActivity extends Activity {
     protected void onResume() {
         super.onResume();
 
+        // TODO
         // Close this activity if the user is already logged in.
-        if(communicationManager.getAccountAuthenticationTokenExpire() > (System.currentTimeMillis() / 1000)) {
+        /*if(communicationManager.getAccountAuthenticationTokenExpire() > (System.currentTimeMillis() / 1000)) {
             finish();
-        }
+        }*/
 
         bus.register(this);
         updateUI();
@@ -173,7 +173,7 @@ public class LoginActivity extends Activity {
      * Starts the account authentication process with the in the text fields provided information.
      */
     public void authenticateAccount() {
-        if(!communicationManager.getAccountAuthenticationInProgress().get()) {
+        if(!communicationManager.inProgress().get()) {
             EditText editText_accountEmailLogin = findViewById(R.id.editText_accountEmailLogin);
             EditText editText_accountPasswordLogin = findViewById(R.id.editText_accountPasswordLogin);
 

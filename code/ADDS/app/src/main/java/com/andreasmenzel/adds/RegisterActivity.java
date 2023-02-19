@@ -18,6 +18,7 @@ import com.andreasmenzel.adds.Events.AccountRegistrationFailed;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceeded;
 import com.andreasmenzel.adds.Events.AccountRegistrationSucceededPartially;
 import com.andreasmenzel.adds.Events.ToastMessage;
+import com.andreasmenzel.adds.Manager.CommunicationManager;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -42,8 +43,8 @@ public class RegisterActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
-        communicationManager = MyApplication.getCommunicationManager();
-        responseAnalyzer = communicationManager.getAccountRegistrationResponseAnalyzer();
+        communicationManager = MyApplication.getCommunicationManagerRegisterAccountNotNull();
+        responseAnalyzer = communicationManager.getResponseAnalyzer();
     }
 
     /**
@@ -64,10 +65,11 @@ public class RegisterActivity extends Activity {
     protected void onResume() {
         super.onResume();
 
+        // TODO
         // Close this activity if the user is already logged in.
-        if(communicationManager.getAccountAuthenticationTokenExpire() > (System.currentTimeMillis() / 1000)) {
+        /*if(communicationManager.getAccountAuthenticationTokenExpire() > (System.currentTimeMillis() / 1000)) {
             finish();
-        }
+        }*/
 
         bus.register(this);
         updateUI();
@@ -172,7 +174,7 @@ public class RegisterActivity extends Activity {
      * Starts the account registration process with the in the text fields provided information.
      */
     public void registerAccount() {
-        if(!communicationManager.getAccountRegistrationInProgress().get()) {
+        if(!communicationManager.inProgress().get()) {
             EditText editText_accountEmailRegister = findViewById(R.id.editText_accountEmailRegister);
             EditText editText_accountFirstnameRegister = findViewById(R.id.editText_accountFirstnameRegister);
             EditText editText_accountLastnameRegister = findViewById(R.id.editText_accountLastnameRegister);
